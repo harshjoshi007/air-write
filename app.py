@@ -29,15 +29,14 @@ def main():
             if (base) return new OriginalURL(url, base);
             return new OriginalURL(url);
           } catch (e) {
-            // Check for invalid URL error which happens with relative paths in srcdoc
-            if (e instanceof TypeError && (e.message.includes("Invalid URL") || e.message.includes("Failed to construct 'URL'"))) {
-              console.warn("Streamlit Patch: Intercepted invalid URL construction. URL:", url, "Base:", base);
-              try {
-                // Fallback to a dummy base so the app doesn't crash
-                return new OriginalURL(url, "https://example.com");
-              } catch (e2) {}
+            console.warn("Streamlit Patch: URL construction failed. URL:", url, "Base:", base, "Error:", e.message);
+            try {
+              // Attempt to recover with a dummy base
+              return new OriginalURL(url, "https://example.com");
+            } catch (e2) {
+              // Complete fallback if even that fails
+              return new OriginalURL("https://example.com");
             }
-            throw e;
           }
         };
         SafeURL.prototype = OriginalURL.prototype;
@@ -79,8 +78,10 @@ def main():
     </script>
     """
 
-    if "</head>" in html_content:
-        html_content = html_content.replace("</head>", error_script + "</head>")
+    if "<head>" in html_content:
+        html_content = html_content.replace("<head>", "<head>" + error_script)
+    elif "<body>" in html_content:
+        html_content = html_content.replace("<body>", "<body>" + error_script)
     else:
         html_content = error_script + html_content
 
