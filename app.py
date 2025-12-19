@@ -21,6 +21,35 @@ def main():
 
     error_script = """
     <script>
+      (function() {
+        // Patch URL to prevent crashes in srcdoc (iframe) environment
+        var OriginalURL = window.URL;
+        var SafeURL = function(url, base) {
+          try {
+            if (base) return new OriginalURL(url, base);
+            return new OriginalURL(url);
+          } catch (e) {
+            // Check for invalid URL error which happens with relative paths in srcdoc
+            if (e instanceof TypeError && (e.message.includes("Invalid URL") || e.message.includes("Failed to construct 'URL'"))) {
+              console.warn("Streamlit Patch: Intercepted invalid URL construction. URL:", url, "Base:", base);
+              try {
+                // Fallback to a dummy base so the app doesn't crash
+                return new OriginalURL(url, "https://example.com");
+              } catch (e2) {}
+            }
+            throw e;
+          }
+        };
+        SafeURL.prototype = OriginalURL.prototype;
+        // Copy static methods like createObjectURL
+        for (var prop in OriginalURL) {
+          if (Object.prototype.hasOwnProperty.call(OriginalURL, prop)) {
+            SafeURL[prop] = OriginalURL[prop];
+          }
+        }
+        window.URL = SafeURL;
+      })();
+
       window.onerror = function(message, source, lineno, colno, error) {
         var errorDiv = document.createElement("div");
         errorDiv.style.color = "red";
